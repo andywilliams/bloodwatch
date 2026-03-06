@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BLOODWATCH — Character Composer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0d0a0e;
+    --panel:    #13101a;
+    --border:   #2a1f3d;
+    --accent:   #8b2fc9;
+    --red:      #c92f2f;
+    --gold:     #c9922f;
+    --text:     #c8b8d8;
+    --dim:      #5a4a6a;
+    --canvas-bg:#1a1020;
+    --pixel:    4px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem;
+    background-image:
+      radial-gradient(ellipse at 20% 0%, #1a0a2e 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 100%, #1a0510 0%, transparent 60%);
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+
+  h1 {
+    font-family: 'UnifrakturMaguntia', serif;
+    font-size: clamp(2rem, 6vw, 3.5rem);
+    color: #fff;
+    text-shadow: 0 0 30px var(--accent), 0 0 60px rgba(139,47,201,0.3);
+    letter-spacing: 0.05em;
+  }
+
+  .subtitle {
+    color: var(--dim);
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-top: 0.4rem;
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 2rem;
+    width: 100%;
+    max-width: 900px;
+    align-items: start;
+  }
+
+  /* ── PREVIEW PANEL ── */
+  .preview-panel {
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .canvas-wrap {
+    position: relative;
+    background: var(--canvas-bg);
+    border: 1px solid var(--border);
+    padding: 2rem;
+    box-shadow: 0 0 0 1px var(--border), 0 0 40px rgba(139,47,201,0.15);
+  }
+
+  .canvas-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 15px,
+      rgba(139,47,201,0.03) 15px, rgba(139,47,201,0.03) 16px
+    );
+    pointer-events: none;
+  }
+
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  .frame-counter {
+    font-size: 0.65rem;
+    color: var(--dim);
+    letter-spacing: 0.2em;
+  }
+
+  /* ── CONTROLS ── */
+  .controls-left, .controls-right {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .controls-left { align-items: flex-end; }
+  .controls-right { align-items: flex-start; }
+
+  .layer-group {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 0.75rem 1rem;
+    width: 200px;
+    position: relative;
+  }
+
+  .layer-group::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--accent);
+    opacity: 0.4;
+  }
+
+  .layer-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 0.5rem;
+  }
+
+  .layer-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .opt-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all 0.1s;
+    text-transform: uppercase;
+  }
+
+  .opt-btn:hover { border-color: var(--accent); color: var(--text); }
+  .opt-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .opt-btn.none-btn.active { background: var(--dim); border-color: var(--dim); }
+
+  /* ── SPEED ── */
+  .speed-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.65rem;
+    color: var(--dim);
+    letter-spacing: 0.15em;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100px;
+    height: 2px;
+    background: var(--border);
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px; height: 10px;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  /* ── EXPORT ── */
+  .export-row {
+    margin-top: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .export-btn {
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .export-btn:hover { background: var(--gold); color: var(--bg); }
+
+  /* ── PALETTE SWATCH ── */
+  .palette-row {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+  }
+  .swatch {
+    width: 12px; height: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  .swatch:hover { transform: scale(1.3); }
+  .swatch.active { outline: 1px solid #fff; outline-offset: 1px; }
+
+  @media (max-width: 700px) {
+    .workspace { grid-template-columns: 1fr; }
+    .preview-panel { grid-column: 1; }
+    .controls-left, .controls-right { align-items: flex-start; }
+    .layer-group { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Bloodwatch</h1>
+  <p class="subtitle">Character Composer — POC</p>
+</header>
+
+<div class="workspace">
+
+  <!-- LEFT CONTROLS -->
+  <div class="controls-left">
+
+    <div class="layer-group">
+      <div class="layer-label">Body</div>
+      <div class="layer-options" data-layer="body">
+        <button class="opt-btn active" data-val="standard">Standard</button>
+        <button class="opt-btn" data-val="large">Large</button>
+      </div>
+    </div>
+
+    <div class="layer-group">
+      <div class="layer-label">Torso Armour</div>
+      <div class="layer-options" data-layer="torso">
+        <button class="opt-btn none-btn active" data-val="none">None</button>
+        <button class="opt-btn" data-val="plate">Plate</button>
+        <button class="opt-btn" data-val="leather">Leather</button>
+        <button class="opt-btn" data-val="robes">Robes</button>
+      </div>
+    </div>
+
+    <div class="layer-group">
+      <div class="layer-label">Helmet</div>
+      <div class="layer-options" data-layer="helm">
+        <button class="opt-btn none-btn active" data-val="none">None</button>
+        <button class="opt-btn" data-val="great_helm">Great Helm</button>
+        <button class="opt-btn" data-val="hood">Hood</button>
+        <button class="opt-btn" data-val="wolf_head">Wolf Head</button>
+      </div>
+    </div>
+
+    <div class="layer-group">
+      <div class="layer-label">Cape</div>
+      <div class="layer-options" data-layer="cape">
+        <button class="opt-btn none-btn active" data-val="none">None</button>
+        <button class="opt-btn" data-val="dark">Dark Cape</button>
+        <button class="opt-btn" data-val="tattered">Tattered</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- PREVIEW -->
+  <div class="preview-panel">
+    <div class="canvas-wrap">
+      <canvas id="c" width="80" height="96"></canvas>
+    </div>
+    <div class="frame-counter" id="frameLabel">FRAME 1 / 3</div>
+
+    <div class="speed-row">
+      <span>SPEED</span>
+      <input type="range" id="speedSlider" min="80" max="600" value="220" step="20">
+    </div>
+
+    <div class="palette-row" id="paletteRow"></div>
+
+    <div class="export-row">
+      <button class="export-btn" id="exportBtn">Export JSON</button>
+      <button class="export-btn" id="exportPng">Export PNG</button>
+    </div>
+  </div>
+
+  <!-- RIGHT CONTROLS -->
+  <div class="controls-right">
+
+    <div class="layer-group">
+      <div class="layer-label">Weapon</div>
+      <div class="layer-options" data-layer="weapon">
+        <button class="opt-btn none-btn active" data-val="none">None</button>
+        <button class="opt-btn" data-val="sword">Sword</button>
+        <button class="opt-btn" data-val="crossbow">Crossbow</button>
+        <button class="opt-btn" data-val="staff">Staff</button>
+        <button class="opt-btn" data-val="flask">Flask</button>
+        <button class="opt-btn" data-val="claws">Claws</button>
+      </div>
+    </div>
+
+    <div class="layer-group">
+      <div class="layer-label">Shield</div>
+      <div class="layer-options" data-layer="shield">
+        <button class="opt-btn none-btn active" data-val="none">None</button>
+        <button class="opt-btn" data-val="kite">Kite Shield</button>
+        <button class="opt-btn" data-val="buckler">Buckler</button>
+      </div>
+    </div>
+
+    <div class="layer-group">
+      <div class="layer-label">FX Overlay</div>
+      <div class="layer-options" data-layer="fx">
+        <button class="opt-btn none-btn active" data-val="none">None</button>
+        <button class="opt-btn" data-val="ember">Embers</button>
+        <button class="opt-btn" data-val="pale">Pale/Undead</button>
+        <button class="opt-btn" data-val="fur">Fur</button>
+        <button class="opt-btn" data-val="glow">Holy Glow</button>
+      </div>
+    </div>
+
+    <div class="layer-group">
+      <div class="layer-label">Palette</div>
+      <div class="layer-options" data-layer="palette">
+        <button class="opt-btn active" data-val="knight">Knight</button>
+        <button class="opt-btn" data-val="ranger">Ranger</button>
+        <button class="opt-btn" data-val="priest">Priest</button>
+        <button class="opt-btn" data-val="fire">Ashcaller</button>
+        <button class="opt-btn" data-val="wolf">Greyborn</button>
+        <button class="opt-btn" data-val="thrall">Thrall</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// PIXEL SCALE
+// ─────────────────────────────────────────────────────────────
+const SCALE = 4;        // each "pixel" = 4×4 real pixels
+const W = 20, H = 24;  // sprite dimensions in game-pixels
+const canvas = document.getElementById('c');
+canvas.width  = W * SCALE;
+canvas.height = H * SCALE;
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+// ─────────────────────────────────────────────────────────────
+// PALETTES  (skin, hair, primary armour, secondary, metal, outline)
+// ─────────────────────────────────────────────────────────────
+const PALETTES = {
+  knight:  { skin:'#d4956a', hair:'#3a2010', pri:'#8a9ab0', sec:'#c9a22f', met:'#ccd6e0', out:'#0d0a0e', cloth:'#3a3050' },
+  ranger:  { skin:'#c87850', hair:'#1a3010', pri:'#4a6040', sec:'#7a5030', met:'#8a8070', out:'#0d0a0e', cloth:'#2a3020' },
+  priest:  { skin:'#d4b090', hair:'#e0d0a0', pri:'#c8c0b0', sec:'#c9a22f', met:'#e0e0d0', out:'#0d0a0e', cloth:'#a09080' },
+  fire:    { skin:'#c86040', hair:'#c83010', pri:'#6a4030', sec:'#c96020', met:'#e0a060', out:'#0d0a0e', cloth:'#4a2020' },
+  wolf:    { skin:'#8a7060', hair:'#404040', pri:'#4a5040', sec:'#8a8070', met:'#7a7060', out:'#0d0a0e', cloth:'#303030' },
+  thrall:  { skin:'#9090b0', hair:'#303050', pri:'#606080', sec:'#404060', met:'#9090a0', out:'#0d0a0e', cloth:'#404060' },
+};
+
+// ─────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────
+let state = { body:'standard', torso:'none', helm:'none', cape:'none', weapon:'none', shield:'none', fx:'none', palette:'knight' };
+let frame = 0;
+let tick  = 0;
+let speed = 220;
+
+// Bob offsets for 3-frame idle: 0=neutral, 1=up, 2=down
+const BOB = [0, -1, 0];
+
+// ─────────────────────────────────────────────────────────────
+// DRAW HELPERS
+// ─────────────────────────────────────────────────────────────
+function px(x, y, col) {
+  if (!col || col === 'none') return;
+  ctx.fillStyle = col;
+  ctx.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+}
+
+function rect(x, y, w, h, col) {
+  if (!col || col === 'none') return;
+  ctx.fillStyle = col;
+  ctx.fillRect(x * SCALE, y * SCALE, w * SCALE, h * SCALE);
+}
+
+// ─────────────────────────────────────────────────────────────
+// LAYERS
+// ─────────────────────────────────────────────────────────────
+function drawCape(p, bob) {
+  if (state.cape === 'none') return;
+  const col = state.cape === 'tattered' ? '#2a1a20' : '#1a0a2a';
+  // cape behind body — hangs from shoulders
+  rect(7, 7 + bob, 6, 10, col);
+  if (state.cape === 'tattered') {
+    px(7,  16 + bob, '#1a0a18');
+    px(9,  17 + bob, '#1a0a18');
+    px(12, 16 + bob, '#1a0a18');
+  }
+}
+
+function drawBody(p, bob) {
+  const large = state.body === 'large';
+  const W2 = large ? 7 : 6;
+
+  // Legs
+  rect(8, 15 + bob, 2, 5, p.pri);
+  rect(11, 15 + bob, 2, 5, p.pri);
+  // Boots
+  rect(7, 19 + bob, 3, 2, p.sec);
+  rect(11, 19 + bob, 3, 2, p.sec);
+  // Torso base (cloth/skin)
+  rect(8, 9 + bob, 5, 6, p.cloth);
+  // Arms
+  rect(6, 9 + bob, 2, 5, p.skin);
+  rect(13, 9 + bob, 2, 5, p.skin);
+  // Hands
+  px(6, 14 + bob, p.skin);
+  px(14, 14 + bob, p.skin);
+  // Head
+  rect(8, 3 + bob, 5, 6, p.skin);
+  // Eyes
+  px(9,  5 + bob, p.out);
+  px(11, 5 + bob, p.out);
+  // Hair (behind helm)
+  if (state.helm === 'none') {
+    rect(8, 3 + bob, 5, 2, p.hair);
+  }
+  // Outline
+  ctx.fillStyle = p.out;
+  // head outline
+  rect(8, 2 + bob, 5, 1, p.out);
+  rect(7, 3 + bob, 1, 6, p.out);
+  rect(13, 3 + bob, 1, 6, p.out);
+  rect(8, 8 + bob, 5, 1, p.out);
+}
+
+function drawTorso(p, bob) {
+  if (state.torso === 'none') return;
+  if (state.torso === 'plate') {
+    rect(7, 9 + bob, 7, 7, p.pri);
+    rect(7, 9 + bob, 1, 7, p.met); // highlight
+    rect(8, 9 + bob, 5, 1, p.met);
+    // pauldrons
+    rect(6,  9 + bob, 2, 3, p.pri);
+    rect(13, 9 + bob, 2, 3, p.pri);
+    // belt
+    rect(7, 14 + bob, 7, 1, p.sec);
+    // outline
+    rect(6,  8 + bob, 9, 1, p.out);
+    rect(5,  9 + bob, 1, 7, p.out);
+    rect(15, 9 + bob, 1, 7, p.out);
+  } else if (state.torso === 'leather') {
+    rect(7, 9 + bob, 7, 6, p.pri);
+    rect(8, 9 + bob, 5, 1, '#00000040');
+    rect(7, 12 + bob, 7, 1, p.sec); // belt
+  } else if (state.torso === 'robes') {
+    rect(6, 9 + bob, 9, 8, p.cloth);
+    rect(6, 9 + bob, 1, 8, p.met); // trim
+    rect(14,9 + bob, 1, 8, p.met);
+    rect(9, 15 + bob, 3, 3, p.cloth); // robe skirt
+  }
+}
+
+function drawHelm(p, bob) {
+  if (state.helm === 'none') return;
+  if (state.helm === 'great_helm') {
+    rect(7, 2 + bob, 7, 7, p.pri);
+    rect(7, 2 + bob, 1, 7, p.met);
+    rect(8, 2 + bob, 6, 1, p.met);
+    // visor slit
+    rect(8, 5 + bob, 5, 1, p.out);
+    rect(7, 1 + bob, 7, 1, p.out);
+    rect(6, 2 + bob, 1, 7, p.out);
+    rect(14,2 + bob, 1, 7, p.out);
+  } else if (state.helm === 'hood') {
+    rect(7, 1 + bob, 7, 8, p.pri);
+    rect(8, 0 + bob, 5, 2, p.pri);
+    rect(9, 5 + bob, 3, 1, p.skin); // face gap
+    rect(6, 2 + bob, 1, 5, p.pri);
+    rect(14,2 + bob, 1, 5, p.pri);
+  } else if (state.helm === 'wolf_head') {
+    rect(7, 1 + bob, 7, 8, p.hair);
+    rect(8, 0 + bob, 5, 2, p.hair);
+    // ears
+    px(7,  0 + bob, p.hair);
+    px(14, 0 + bob, p.hair);
+    // snout
+    rect(9, 6 + bob, 3, 2, p.out);
+    px(9,  5 + bob, p.skin);
+    px(12, 5 + bob, p.skin);
+  }
+}
+
+function drawWeapon(p, bob) {
+  if (state.weapon === 'none') return;
+  if (state.weapon === 'sword') {
+    rect(14, 9 + bob, 1, 8, p.met);  // blade
+    px(14,   8 + bob, p.sec);        // guard
+    px(15,   8 + bob, p.sec);
+    px(14,  16 + bob, p.sec);        // tip
+  } else if (state.weapon === 'crossbow') {
+    rect(13, 11 + bob, 3, 2, p.sec);
+    rect(15, 10 + bob, 1, 4, p.sec);
+    px(13,   11 + bob, p.met);
+  } else if (state.weapon === 'staff') {
+    rect(14, 3 + bob, 1, 14, p.sec);
+    rect(13, 2 + bob, 3,  2, p.met);
+    px(14,   2 + bob, '#ffe090');
+  } else if (state.weapon === 'flask') {
+    rect(14, 10 + bob, 2, 3, '#e06020');
+    rect(14,  9 + bob, 2, 1, p.met);
+    px(15,    8 + bob, p.met);
+  } else if (state.weapon === 'claws') {
+    px(15, 13 + bob, p.met);
+    px(16, 12 + bob, p.met);
+    px(14, 12 + bob, p.met);
+    px(16, 14 + bob, p.met);
+  }
+}
+
+function drawShield(p, bob) {
+  if (state.shield === 'none') return;
+  if (state.shield === 'kite') {
+    rect(4, 9 + bob, 3, 6, p.pri);
+    px(5,  14 + bob, p.pri); // kite point
+    // cross
+    px(5,  10 + bob, p.sec);
+    px(5,  11 + bob, p.sec);
+    px(4,  11 + bob, p.sec);
+    px(6,  11 + bob, p.sec);
+    rect(3, 8 + bob, 5, 1, p.out);
+    rect(3, 9 + bob, 1, 6, p.out);
+    rect(7, 9 + bob, 1, 6, p.out);
+  } else if (state.shield === 'buckler') {
+    rect(4, 10 + bob, 3, 4, p.pri);
+    px(5,  11 + bob, p.met);
+  }
+}
+
+function drawFX(p, bob, frameIdx) {
+  if (state.fx === 'none') return;
+  if (state.fx === 'ember') {
+    const positions = [[6,8],[14,6],[7,18],[15,12],[5,14]];
+    positions.forEach(([x, y], i) => {
+      const flicker = (frameIdx + i) % 3;
+      if (flicker < 2) px(x, y + bob, '#e06020');
+      if (flicker < 1) px(x-1, y-1 + bob, '#e0a020');
+    });
+  } else if (state.fx === 'pale') {
+    // Blue-grey tint on skin areas — already handled by thrall palette
+    ctx.fillStyle = 'rgba(100,100,160,0.15)';
+    ctx.fillRect(8 * SCALE, (3 + bob) * SCALE, 5 * SCALE, 6 * SCALE);
+    ctx.fillRect(6 * SCALE, (9 + bob) * SCALE, 2 * SCALE, 5 * SCALE);
+    ctx.fillRect(13 * SCALE, (9 + bob) * SCALE, 2 * SCALE, 5 * SCALE);
+  } else if (state.fx === 'fur') {
+    // Fur tufts on arms
+    const furCol = p.hair;
+    px(5,  9 + bob, furCol); px(5, 10 + bob, furCol);
+    px(15, 9 + bob, furCol); px(15,10 + bob, furCol);
+    px(5, 11 + bob, furCol); px(15,11 + bob, furCol);
+  } else if (state.fx === 'glow') {
+    const alpha = frameIdx === 1 ? 0.25 : 0.15;
+    ctx.fillStyle = `rgba(220,200,100,${alpha})`;
+    ctx.fillRect(6 * SCALE, (1 + bob) * SCALE, 9 * SCALE, 10 * SCALE);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────────────────────
+function render() {
+  const p   = PALETTES[state.palette] || PALETTES.knight;
+  const bob = BOB[frame];
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawCape(p, bob);
+  drawBody(p, bob);
+  drawTorso(p, bob);
+  drawHelm(p, bob);
+  drawWeapon(p, bob);
+  drawShield(p, bob);
+  drawFX(p, bob, frame);
+
+  document.getElementById('frameLabel').textContent = `FRAME ${frame + 1} / 3  |  BOB ${bob >= 0 ? '+' : ''}${bob}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// ANIMATION LOOP
+// ─────────────────────────────────────────────────────────────
+let lastTime = 0;
+function loop(ts) {
+  if (ts - lastTime > speed) {
+    frame = (frame + 1) % 3;
+    render();
+    lastTime = ts;
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ─────────────────────────────────────────────────────────────
+// CONTROLS
+// ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.layer-options').forEach(group => {
+  const layer = group.dataset.layer;
+  group.querySelectorAll('.opt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      group.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state[layer] = btn.dataset.val;
+      render();
+    });
+  });
+});
+
+document.getElementById('speedSlider').addEventListener('input', e => {
+  speed = parseInt(e.target.value);
+});
+
+// ─────────────────────────────────────────────────────────────
+// EXPORT
+// ─────────────────────────────────────────────────────────────
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const json = JSON.stringify(state, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'character.json';
+  a.click();
+});
+
+document.getElementById('exportPng').addEventListener('click', () => {
+  // Render all 3 frames into a sprite sheet
+  const sheet = document.createElement('canvas');
+  sheet.width  = W * SCALE * 3;
+  sheet.height = H * SCALE;
+  const sctx = sheet.getContext('2d');
+  sctx.imageSmoothingEnabled = false;
+  [0, 1, 2].forEach(f => {
+    frame = f;
+    render();
+    sctx.drawImage(canvas, f * W * SCALE, 0);
+  });
+  frame = 0; render();
+  const a = document.createElement('a');
+  a.href = sheet.toDataURL('image/png');
+  a.download = 'character-spritesheet.png';
+  a.click();
+});
+
+// Initial render
+render();
+</script>
+</body>
+</html>
